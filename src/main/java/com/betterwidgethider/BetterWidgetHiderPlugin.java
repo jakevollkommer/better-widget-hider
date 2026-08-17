@@ -35,6 +35,7 @@ import lombok.Value;
 import net.runelite.api.Client;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetUtil;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
@@ -50,7 +51,7 @@ import net.runelite.client.util.Text;
 )
 public class BetterWidgetHiderPlugin extends Plugin
 {
-	private List<WidgetEntry> entries = Collections.emptyList();
+	private List<WidgetEntry> entriesToHide = Collections.emptyList();
 
 	@Inject
 	private Client client;
@@ -70,15 +71,15 @@ public class BetterWidgetHiderPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		entries = parseEntries(config.widgetIds());
+		entriesToHide = parseEntries(config.widgetIds());
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		List<WidgetEntry> toRestore = entries;
-		entries = Collections.emptyList();
-		clientThread.invokeLater(() -> toRestore.forEach(this::showWidget));
+		List<WidgetEntry> entriesToRestore = entriesToHide;
+		entriesToHide = Collections.emptyList();
+		clientThread.invokeLater(() -> entriesToRestore.forEach(this::showWidget));
 	}
 
 	@Subscribe
@@ -89,14 +90,14 @@ public class BetterWidgetHiderPlugin extends Plugin
 			return;
 		}
 
-		List<WidgetEntry> previous = entries;
-		entries = parseEntries(config.widgetIds());
+		List<WidgetEntry> previousEntries = entriesToHide;
+		entriesToHide = parseEntries(config.widgetIds());
 		// un-hide anything that was removed from the list; the game's own scripts take
 		// visibility back over from there
-		List<WidgetEntry> removed = previous.stream()
-			.filter(entry -> !entries.contains(entry))
+		List<WidgetEntry> removedEntries = previousEntries.stream()
+			.filter(entry -> !entriesToHide.contains(entry))
 			.collect(Collectors.toList());
-		clientThread.invokeLater(() -> removed.forEach(this::showWidget));
+		clientThread.invokeLater(() -> removedEntries.forEach(this::showWidget));
 	}
 
 	@Subscribe
@@ -104,7 +105,7 @@ public class BetterWidgetHiderPlugin extends Plugin
 	{
 		// interfaces are rebuilt by clientscripts whenever their values update, which
 		// resets the hidden flag, so re-hide every client tick
-		entries.forEach(this::hideWidget);
+		entriesToHide.forEach(this::hideWidget);
 	}
 
 	private void hideWidget(WidgetEntry entry)
@@ -132,19 +133,19 @@ public class BetterWidgetHiderPlugin extends Plugin
 	@Nullable
 	private Widget resolveWidget(WidgetEntry entry)
 	{
-		Widget widget = client.getWidget(entry.getGroup() << 16 | entry.getChild());
-		boolean wantsDynamicChild = entry.getIndex() >= 0;
-		if (widget == null || !wantsDynamicChild)
+		Widget widget = client.getWidget(WidgetUtil.packComponentId(entry.getGroup(), entry.getChild()));
+		if (widget == null || !entry.hasDynamicChildIndex())
 		{
 			return widget;
 		}
 
-		return widget.getChild(entry.getIndex());
+		return widget.getChild(entry.getDynamicChildIndex());
 	}
 
 	private static List<WidgetEntry> parseEntries(String widgetIds)
 	{
-		return Text.fromCSV(widgetIds.replace('\n', ',')).stream()
+		String commaSeparated = widgetIds.replace('\n', ',');
+		return Text.fromCSV(commaSeparated).stream()
 			.map(BetterWidgetHiderPlugin::parseEntry)
 			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
@@ -153,8 +154,8 @@ public class BetterWidgetHiderPlugin extends Plugin
 	@Nullable
 	private static WidgetEntry parseEntry(String token)
 	{
-		String[] parts = token.trim().split("\\.");
-		boolean isGroupChildForm = parts.length == 2 || parts.length == 3;
+		String[] segments = token.trim().split("\\.");
+		boolean isGroupChildForm = segments.length == 2 || segments.length == 3;
 		if (!isGroupChildForm)
 		{
 			return null;
@@ -162,12 +163,15 @@ public class BetterWidgetHiderPlugin extends Plugin
 
 		try
 		{
-			return new WidgetEntry(
-				Integer.parseInt(parts[0]),
-				Integer.parseInt(parts[1]),
-				parts.length == 3 ? Integer.parseInt(parts[2]) : -1);
+			int group = Integer.parseInt(segments[0]);
+			int child = Integer.parseInt(segments[1]);
+			boolean hasDynamicChildSegment = segments.length == 3;
+			int dynamicChildIndex = hasDynamicChildSegment
+				? Integer.parseInt(segments[2])
+				: WidgetEntry.NO_DYNAMIC_CHILD;
+			return new WidgetEntry(group, child, dynamicChildIndex);
 		}
-		catch (NumberFormatException ex)
+		catch (NumberFormatException invalidNumber)
 		{
 			return null;
 		}
@@ -176,8 +180,15 @@ public class BetterWidgetHiderPlugin extends Plugin
 	@Value
 	private static class WidgetEntry
 	{
+		static final int NO_DYNAMIC_CHILD = -1;
+
 		int group;
 		int child;
-		int index;
+		int dynamicChildIndex;
+
+		boolean hasDynamicChildIndex()
+		{
+			return dynamicChildIndex != NO_DYNAMIC_CHILD;
+		}
 	}
 }

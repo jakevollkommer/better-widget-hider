@@ -36,9 +36,7 @@ public interface BetterWidgetHiderConfig extends Config
 	@ConfigItem(
 		keyName = "widgetIds",
 		name = "Widgets to hide",
-		description = "Widget IDs to hide, separated by commas or newlines, as group.child (e.g. 746.5)"
-			+ " or group.child.index for a dynamic child.<br>"
-			+ "Find IDs with the Dev Tools plugin's Widget Inspector.",
+		description = "e.g. 746.5, comma or newline separated. Find IDs with Dev Tools' Widget Inspector",
 		position = 0
 	)
 	default String widgetIds()
