@@ -25,12 +25,13 @@
 package com.betterwidgethider;
 
 import com.google.inject.Provides;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import lombok.Value;
-import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.events.ClientTick;
 import net.runelite.api.widgets.Widget;
@@ -47,7 +48,6 @@ import net.runelite.client.util.Text;
 	description = "Hide specific parts of game interfaces (HUDs, overlays) by widget ID",
 	tags = {"widget", "interface", "hide", "hider", "hud", "overlay", "gotr"}
 )
-@Slf4j
 public class BetterWidgetHiderPlugin extends Plugin
 {
 	private List<WidgetEntry> entries = Collections.emptyList();
@@ -70,7 +70,7 @@ public class BetterWidgetHiderPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		entries = parse(config.widgetIds());
+		entries = parseEntries(config.widgetIds());
 	}
 
 	@Override
@@ -78,7 +78,7 @@ public class BetterWidgetHiderPlugin extends Plugin
 	{
 		List<WidgetEntry> toRestore = entries;
 		entries = Collections.emptyList();
-		clientThread.invokeLater(() -> toRestore.forEach(e -> setHidden(e, false)));
+		clientThread.invokeLater(() -> toRestore.forEach(this::showWidget));
 	}
 
 	@Subscribe
@@ -90,12 +90,13 @@ public class BetterWidgetHiderPlugin extends Plugin
 		}
 
 		List<WidgetEntry> previous = entries;
-		entries = parse(config.widgetIds());
+		entries = parseEntries(config.widgetIds());
 		// un-hide anything that was removed from the list; the game's own scripts take
 		// visibility back over from there
-		List<WidgetEntry> removed = new ArrayList<>(previous);
-		removed.removeAll(entries);
-		clientThread.invokeLater(() -> removed.forEach(e -> setHidden(e, false)));
+		List<WidgetEntry> removed = previous.stream()
+			.filter(entry -> !entries.contains(entry))
+			.collect(Collectors.toList());
+		clientThread.invokeLater(() -> removed.forEach(this::showWidget));
 	}
 
 	@Subscribe
@@ -103,50 +104,73 @@ public class BetterWidgetHiderPlugin extends Plugin
 	{
 		// interfaces are rebuilt by clientscripts whenever their values update, which
 		// resets the hidden flag, so re-hide every client tick
-		for (WidgetEntry entry : entries)
-		{
-			setHidden(entry, true);
-		}
+		entries.forEach(this::hideWidget);
 	}
 
-	private void setHidden(WidgetEntry entry, boolean hidden)
+	private void hideWidget(WidgetEntry entry)
+	{
+		setWidgetHidden(entry, true);
+	}
+
+	private void showWidget(WidgetEntry entry)
+	{
+		setWidgetHidden(entry, false);
+	}
+
+	private void setWidgetHidden(WidgetEntry entry, boolean hidden)
+	{
+		Widget widget = resolveWidget(entry);
+		boolean alreadyInDesiredState = widget == null || widget.isHidden() == hidden;
+		if (alreadyInDesiredState)
+		{
+			return;
+		}
+
+		widget.setHidden(hidden);
+	}
+
+	@Nullable
+	private Widget resolveWidget(WidgetEntry entry)
 	{
 		Widget widget = client.getWidget(entry.getGroup() << 16 | entry.getChild());
-		if (widget != null && entry.getIndex() >= 0)
+		boolean wantsDynamicChild = entry.getIndex() >= 0;
+		if (widget == null || !wantsDynamicChild)
 		{
-			widget = widget.getChild(entry.getIndex());
+			return widget;
 		}
 
-		if (widget != null && widget.isHidden() != hidden)
-		{
-			widget.setHidden(hidden);
-		}
+		return widget.getChild(entry.getIndex());
 	}
 
-	private static List<WidgetEntry> parse(String widgetIds)
+	private static List<WidgetEntry> parseEntries(String widgetIds)
 	{
-		List<WidgetEntry> parsed = new ArrayList<>();
-		for (String token : Text.fromCSV(widgetIds.replace('\n', ',')))
-		{
-			String[] parts = token.trim().split("\\.");
-			if (parts.length < 2 || parts.length > 3)
-			{
-				continue;
-			}
+		return Text.fromCSV(widgetIds.replace('\n', ',')).stream()
+			.map(BetterWidgetHiderPlugin::parseEntry)
+			.filter(Objects::nonNull)
+			.collect(Collectors.toList());
+	}
 
-			try
-			{
-				parsed.add(new WidgetEntry(
-					Integer.parseInt(parts[0]),
-					Integer.parseInt(parts[1]),
-					parts.length == 3 ? Integer.parseInt(parts[2]) : -1));
-			}
-			catch (NumberFormatException ex)
-			{
-				log.debug("ignoring invalid widget entry '{}'", token);
-			}
+	@Nullable
+	private static WidgetEntry parseEntry(String token)
+	{
+		String[] parts = token.trim().split("\\.");
+		boolean isGroupChildForm = parts.length == 2 || parts.length == 3;
+		if (!isGroupChildForm)
+		{
+			return null;
 		}
-		return parsed;
+
+		try
+		{
+			return new WidgetEntry(
+				Integer.parseInt(parts[0]),
+				Integer.parseInt(parts[1]),
+				parts.length == 3 ? Integer.parseInt(parts[2]) : -1);
+		}
+		catch (NumberFormatException ex)
+		{
+			return null;
+		}
 	}
 
 	@Value
