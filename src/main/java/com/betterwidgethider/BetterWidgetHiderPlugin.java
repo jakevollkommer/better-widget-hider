@@ -43,6 +43,9 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.util.Text;
+import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.util.ImageUtil;
 
 @PluginDescriptor(
 	name = "Better Widget Hider",
@@ -51,6 +54,11 @@ import net.runelite.client.util.Text;
 )
 public class BetterWidgetHiderPlugin extends Plugin
 {
+	@Inject
+	private ClientToolbar clientToolbar;
+
+	private NavigationButton navigationButton;
+
 	private List<WidgetEntry> entriesToHide = Collections.emptyList();
 
 	@Inject
@@ -72,6 +80,14 @@ public class BetterWidgetHiderPlugin extends Plugin
 	protected void startUp()
 	{
 		entriesToHide = parseEntries(config.widgetIds());
+
+		navigationButton = NavigationButton.builder()
+			.tooltip("Better Widget Hider")
+			.icon(ImageUtil.loadImageResource(BetterWidgetHiderPlugin.class, "panel_icon.png"))
+			.priority(9)
+			.panel(new BetterWidgetHiderPanel())
+			.build();
+		clientToolbar.addNavigation(navigationButton);
 	}
 
 	@Override
@@ -80,6 +96,7 @@ public class BetterWidgetHiderPlugin extends Plugin
 		List<WidgetEntry> entriesToRestore = entriesToHide;
 		entriesToHide = Collections.emptyList();
 		clientThread.invokeLater(() -> entriesToRestore.forEach(this::showWidget));
+		clientToolbar.removeNavigation(navigationButton);
 	}
 
 	@Subscribe
