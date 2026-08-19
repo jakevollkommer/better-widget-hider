@@ -43,6 +43,7 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.util.Text;
+import net.runelite.client.util.LinkBrowser;
 
 @PluginDescriptor(
 	name = "Better Widget Hider",
@@ -51,6 +52,9 @@ import net.runelite.client.util.Text;
 )
 public class BetterWidgetHiderPlugin extends Plugin
 {
+	@Inject
+	private ConfigManager configManager;
+
 	private List<WidgetEntry> entriesToHide = Collections.emptyList();
 
 	@Inject
@@ -61,6 +65,23 @@ public class BetterWidgetHiderPlugin extends Plugin
 
 	@Inject
 	private BetterWidgetHiderConfig config;
+
+	// The config panel cannot host real buttons, so "Buy me a coffee" is a checkbox that
+	// opens the Ko-fi page when ticked and immediately unticks itself.
+	@Subscribe
+	public void onSupportButtonPressed(ConfigChanged event)
+	{
+		boolean isSupportButtonTick = BetterWidgetHiderConfig.GROUP.equals(event.getGroup())
+			&& "supportButton".equals(event.getKey())
+			&& Boolean.parseBoolean(event.getNewValue());
+		if (!isSupportButtonTick)
+		{
+			return;
+		}
+
+		LinkBrowser.browse("https://ko-fi.com/jakevollkommer");
+		configManager.setConfiguration(BetterWidgetHiderConfig.GROUP, "supportButton", false);
+	}
 
 	@Provides
 	BetterWidgetHiderConfig provideConfig(ConfigManager configManager)
