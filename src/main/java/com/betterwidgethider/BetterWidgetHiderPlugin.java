@@ -48,13 +48,10 @@ import net.runelite.client.util.LinkBrowser;
 @PluginDescriptor(
 	name = "Better Widget Hider",
 	description = "Hide specific parts of game interfaces (HUDs, overlays) by widget ID",
-	tags = {"widget", "interface", "hide", "hider", "hud", "overlay", "gotr"}
+	tags = {"jake", "widget", "widgets", "interface", "hide", "hider", "hud", "overlay", "clean", "declutter", "component", "id", "gotr"}
 )
 public class BetterWidgetHiderPlugin extends Plugin
 {
-	@Inject
-	private ConfigManager configManager;
-
 	private List<WidgetEntry> entriesToHide = Collections.emptyList();
 
 	@Inject
@@ -67,20 +64,19 @@ public class BetterWidgetHiderPlugin extends Plugin
 	private BetterWidgetHiderConfig config;
 
 	// The config panel cannot host real buttons, so "Buy me a coffee" is a checkbox that
-	// opens the Ko-fi page when ticked and immediately unticks itself.
+	// acts as a button: any click of the box, tick or untick, opens the Ko-fi page.
 	@Subscribe
 	public void onSupportButtonPressed(ConfigChanged event)
 	{
-		boolean isSupportButtonTick = BetterWidgetHiderConfig.GROUP.equals(event.getGroup())
+		boolean isSupportButtonClick = BetterWidgetHiderConfig.GROUP.equals(event.getGroup())
 			&& "supportButton".equals(event.getKey())
-			&& Boolean.parseBoolean(event.getNewValue());
-		if (!isSupportButtonTick)
+			&& event.getNewValue() != null;
+		if (!isSupportButtonClick)
 		{
 			return;
 		}
 
 		LinkBrowser.browse("https://ko-fi.com/jakevollkommer");
-		configManager.setConfiguration(BetterWidgetHiderConfig.GROUP, "supportButton", false);
 	}
 
 	@Provides
