@@ -1,6 +1,6 @@
 # Better Widget Hider
 
-Hide specific parts of the game's built-in interfaces — minigame HUDs, overlays, any widget —
+Hide specific parts of the game's built-in interfaces, minigame HUDs, overlays, any widget -
 by keeping a simple list of widget IDs. Companion to
 [better-object-highlight](https://github.com/jakevollkommer/better-object-highlight)'s
 entity hider, but for the UI instead of the 3D scene.
@@ -9,8 +9,8 @@ entity hider, but for the UI instead of the 3D scene.
 
 Add entries to the **Widgets to hide** list, separated by commas or newlines:
 
-- `group.child` — e.g. `746.5`
-- `group.child.index` — for a dynamic child of a container widget
+- `group.child`, e.g. `746.5`
+- `group.child.index`, for a dynamic child of a container widget
 
 Find widget IDs with RuneLite's built-in **Dev Tools** plugin → *Widget Inspector*
 (requires `--developer-mode`).
