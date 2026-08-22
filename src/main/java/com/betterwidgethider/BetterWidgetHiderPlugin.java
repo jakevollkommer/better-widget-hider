@@ -65,10 +65,9 @@ public class BetterWidgetHiderPlugin extends Plugin
 
 	// The config panel cannot host real buttons, so the Feedback "buttons" are checkboxes
 	// that act as buttons: any click of the box, tick or untick, opens the link.
-	@Subscribe
-	public void onFeedbackButtonPressed(ConfigChanged event)
+	private void handleFeedbackButton(ConfigChanged event)
 	{
-		if (!BetterWidgetHiderConfig.GROUP.equals(event.getGroup()) || event.getNewValue() == null)
+		if (event.getNewValue() == null)
 		{
 			return;
 		}
@@ -121,6 +120,7 @@ public class BetterWidgetHiderPlugin extends Plugin
 			.filter(entry -> !entriesToHide.contains(entry))
 			.collect(Collectors.toList());
 		clientThread.invokeLater(() -> removedEntries.forEach(this::showWidget));
+		handleFeedbackButton(event);
 	}
 
 	@Subscribe
